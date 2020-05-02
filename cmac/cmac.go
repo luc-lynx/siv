@@ -24,7 +24,7 @@ var (
 	}
 
 	errUnsupportedKeySize = errors.New("key size is not supported")
-	errAlreadyFinished = errors.New("the processing has been finalized, reset call is needed")
+	errAlreadyFinished    = errors.New("the processing has been finalized, reset call is needed")
 )
 
 type cmac struct {
@@ -58,7 +58,7 @@ func (c *cmac) Write(p []byte) (n int, err error) {
 	}
 
 	// Leaving last block for final stage
-	for i := 0; i < numFullBlocks - 1; i++ {
+	for i := 0; i < numFullBlocks-1; i++ {
 		c.writeFullBlock(c.accumulator[0:blockSize])
 		c.accumulator = c.accumulator[blockSize:]
 	}
@@ -77,8 +77,10 @@ func (c cmac) Sum(b []byte) []byte {
 			c.accumulator = common.Xor(c.accumulator, c.k1)
 		} else {
 			// we've got a bit more than one block
-			c.writeFullBlock(c.accumulator[0:blockSize])
-			c.accumulator = c.accumulator[blockSize:]
+			if len(c.accumulator) > blockSize {
+				c.writeFullBlock(c.accumulator[0:blockSize])
+				c.accumulator = c.accumulator[blockSize:]
+			}
 			c.accumulator = common.Xor(common.Padding(c.accumulator), c.k2)
 		}
 	} else {
@@ -126,8 +128,6 @@ func (c *cmac) generateSubKey() ([]byte, []byte) {
 	return k1, k2
 }
 
-
-
 func (c *cmac) init() {
 	c.k1, c.k2 = c.generateSubKey()
 	c.accumulator = []byte{}
@@ -135,7 +135,6 @@ func (c *cmac) init() {
 	c.finished = false
 	c.hadData = false
 }
-
 
 func NewCmac(key []byte) (hash.Hash, error) {
 	switch len(key) {

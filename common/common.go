@@ -5,8 +5,8 @@ var (
 )
 
 const (
-	Msb = 0b10000000
-	blockSize = 16
+	Msb               = 0b10000000
+	blockSize         = 16
 	firstPaddingOctet = 0b10000000
 )
 

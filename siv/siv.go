@@ -9,7 +9,6 @@ import (
 	"github.com/luc-lynx/siv/common"
 )
 
-
 /*
 Implementation of Deterministic AES-SIV defined in https://tools.ietf.org/html/rfc5297
 AES is used in CTR mode
@@ -19,13 +18,13 @@ https://tools.ietf.org/html/rfc5116
 
 Some considerations about the mode cn be found at
 https://crypto.stackexchange.com/questions/59076/aes-pmac-siv-ae-algorithm
- */
+*/
 
 var (
-	errKeySizeNotSupported = errors.New("key size not supported")
+	errKeySizeNotSupported     = errors.New("key size not supported")
 	errInvalidCiphertextLength = errors.New("invalid ciphertext length")
-	errIntegrityError = errors.New("integrity error")
-	mask = []byte{
+	errIntegrityError          = errors.New("integrity error")
+	mask                       = []byte{
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 		0x7f, 0xff, 0xff, 0xff, 0x7f, 0xff, 0xff, 0xff,
 	}
@@ -46,7 +45,7 @@ var (
 const (
 	xorEndInvalidParameters = "invalid parameters for xorEnd function, len(a) must be greater or equal than len(b)"
 	bitAndInvalidParameters = "invalid parameters for bitEnd function, len(a) must be equal to len(b)"
-	blockSize = 16
+	blockSize               = 16
 )
 
 type aessiv struct {
@@ -56,15 +55,15 @@ type aessiv struct {
 
 func (a aessiv) NonceSize() int {
 	/*
-	We don't need any external nonce for SIV as SIV generates nonce itself
-	 */
+		We don't need any external nonce for SIV as SIV generates nonce itself
+	*/
 	return 0
 }
 
 func (a aessiv) Overhead() int {
 	/*
-	IV = 128 bits
-	 */
+		IV = 128 bits
+	*/
 	return blockSize
 }
 
@@ -175,10 +174,10 @@ func xorEnd(a, b []byte) []byte {
 /*
 Doubling operation described at
 https://tools.ietf.org/html/rfc5297#section-2.3
- */
+*/
 func dbl(d []byte) []byte {
 	result := common.ShiftLeft(d)
-	if d[0] & common.Msb == common.Msb {
+	if d[0]&common.Msb == common.Msb {
 		return common.Xor(result, rb)
 	}
 	return result

@@ -1,20 +1,33 @@
 package siv
 
 import (
+	"crypto/rand"
 	"crypto/subtle"
+	"errors"
 	"testing"
 )
 
 /*
 Test Vectors for AES-SIV from Appendix A RFC 5297
 https://tools.ietf.org/html/rfc5297#appendix-A
- */
+*/
 
 func TestAesSiv(t *testing.T) {
 	t.Run("bitAnd with mask", testBitAnd)
 	t.Run("dbl", testDouble)
 	t.Run("seal", testSeal)
 	t.Run("open", testOpen)
+	t.Run("seal/open (256 bit each key)", testSeal256)
+	t.Run("random seal/open (256 bits)", func(t *testing.T) {
+		testRandomSealOpen(t, 32)
+	})
+	t.Run("random seal/open (384 bits)", func(t *testing.T) {
+		testRandomSealOpen(t, 48)
+	})
+	t.Run("random seal/open (512 bits)", func(t *testing.T) {
+		testRandomSealOpen(t, 64)
+	})
+	t.Run("bad key size test", testBadKeySize)
 }
 
 func testBitAnd(t *testing.T) {
@@ -89,6 +102,17 @@ var (
 		0x40, 0xc0, 0x2b, 0x96, 0x90, 0xc4, 0xdc, 0x04,
 		0xda, 0xef, 0x7f, 0x6a, 0xfe, 0x5c,
 	}
+
+	key512 = []byte{
+		0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
+		0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
+		0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
+		0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
+		0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
+		0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
+		0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
+		0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff,
+	}
 )
 
 func testSeal(t *testing.T) {
@@ -121,6 +145,94 @@ func testOpen(t *testing.T) {
 	}
 
 	if subtle.ConstantTimeCompare(pt, plaintext) != 1 {
+		t.Fail()
+	}
+}
+
+func testSeal256(t *testing.T) {
+	enc, err := NewAesSIV(key512)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	ct := enc.Seal(nil, nil, plaintext, ad)
+	pt2, err := enc.Open(nil, nil, ct, ad)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	if subtle.ConstantTimeCompare(pt2, plaintext) != 1 {
+		t.Fail()
+	}
+}
+
+func runSealOpen(key, plaintext []byte, aad [][]byte) error {
+	s, err := NewAesSIV(key)
+	if err != nil {
+		return err
+	}
+
+	ct := s.SealWithMultipleAAD(nil, plaintext, aad)
+	pt, err := s.OpenWithMultipleAAD(nil, ct, aad)
+	if err != nil {
+		return err
+	}
+
+	if subtle.ConstantTimeCompare(pt, plaintext) != 1 {
+		return errors.New("plaintext mismatch")
+	}
+	return nil
+}
+
+func testRandomSealOpen(t *testing.T, keyLen int) {
+	// we need at least 256 bits for this mode
+	key := make([]byte, keyLen)
+	_, err := rand.Read(key)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+		return
+	}
+
+	aad := [][]byte{
+		make([]byte, 1),
+		make([]byte, 17),
+		make([]byte, 0),
+		make([]byte, blockSize*2),
+	}
+
+	for i := range aad {
+		if _, err := rand.Read(aad[i]); err != nil {
+			t.Error(err)
+			t.Fail()
+			return
+		}
+	}
+
+	for plaintextLen := 0; plaintextLen < 128; plaintextLen++ {
+		if _, err := rand.Read(plaintext); err != nil {
+			t.Error(err)
+			t.Fail()
+			return
+		}
+
+		err := runSealOpen(key, plaintext, aad)
+		if err != nil {
+			t.Error(err)
+			t.Fail()
+			return
+		}
+	}
+}
+
+func testBadKeySize(t *testing.T) {
+	key := make([]byte, blockSize)
+	_, err := NewAesSIV(key)
+	if err == nil {
 		t.Fail()
 	}
 }
